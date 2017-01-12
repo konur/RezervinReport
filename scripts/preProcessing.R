@@ -9,6 +9,13 @@ mallReq$hour <- substr(mallReq$timestamp, start = 12, stop = 13)
 mallReq$day_hour <- paste0(mallReq$day,'_',mallReq$hour )
 mallReq$day_name <- weekdays(as.Date(mallReq$date))
 
+#Add Additional Date Fields to Find Location Table
+locReqShop$date <- as.Date(locReqShop$timestamp)
+locReqShop$day  <- locReqShop$date - min(locReqShop$date)
+locReqShop$hour <- substr(locReqShop$timestamp, start = 12, stop = 13)
+locReqShop$day_hour <- paste0(locReqShop$day,'_',locReqShop$hour )
+locReqShop$day_name <- weekdays(as.Date(locReqShop$date))
+
 #Add Install Dates to Mall Request Table
 sessionInstallDates <- session[,c("session_id", "timestamp")]
 colnames(sessionInstallDates) <- c("session_id", "installDate")

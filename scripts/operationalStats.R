@@ -173,14 +173,23 @@ operationalStats <- function (mallReq, locReqShop, allUserHomeWork, tableLength,
     grid.arrange(pMR5, pMR6, ncol = 2, top=textGrob("Active Malls Match Ratio Stats", gp=gpar(fontsize=20)))
     
     ###############################################################
-    #Battery Drain Rates for People Work/home near Malls
+    #Battery Drain Rates for People Work/home near Malls vs. Others
     ###############################################################
+    activeLimitDays <- 7
+    
+    #People Work or Live Near Malls
     allUserHomeWork$home_office_dist <- as.numeric(allUserHomeWork$home_office_dist )
     peopleNearMalls <- allUserHomeWork %>%
       filter(mallidNearHome != "0" | mallidNearWork != "0")
     
+    #People Who are Active for at least given days & Filter Out Others
+    activeUsers <- mallReq %>%
+      group_by(session_id)%>%
+      summarize(activeDays = n_distinct(day)) %>%
+      filter(activeDays>=activeLimitDays)
+      
     mallReqBattery <- mallReq %>%
-      filter(is.na(chr) == FALSE & is.na(session_id) == FALSE)
+      filter(is.na(chr) == FALSE & is.na(session_id) == FALSE & session_id %in% activeUsers$session_id)
     
     mallReqBattery$nearMall <- FALSE
     mallReqBattery$nearMall[mallReqBattery$session_id %in% peopleNearMalls$session_id] <- TRUE
@@ -212,7 +221,7 @@ operationalStats <- function (mallReq, locReqShop, allUserHomeWork, tableLength,
     #filter out very large drainRates
     mallReqBatteryGroup <- mallReqBatteryGroup %>%
       filter(drainRate<=300) %>%
-      mutate(drainRateGroup = floor(drainRate/10))
+      mutate(drainRateGroup = 10*floor(drainRate/10))
     
     batteryStats <- mallReqBatteryGroup %>%
       group_by(drainRateGroup, nearMall) %>%
@@ -226,12 +235,31 @@ operationalStats <- function (mallReq, locReqShop, allUserHomeWork, tableLength,
     nearMallCount <- sum(batteryStats$count[batteryStats$nearMall == TRUE])
     otherMallCount <- sum(batteryStats$count[batteryStats$nearMall == FALSE])
     
+    #Add %
+    batteryStats$countPCT <- NA
+    batteryStats$countPCT[batteryStats$nearMall==FALSE] <- round(100*batteryStats$count[batteryStats$nearMall==FALSE] / otherMallCount, digits = 1)
+    batteryStats$countPCT[batteryStats$nearMall==TRUE] <- round(100*batteryStats$count[batteryStats$nearMall==TRUE] / nearMallCount, digits = 1)
     
-    ggplot(data=mallReqBatteryGroup, aes(x = timeDiff, y = chargeDiff)) + 
-      ggtitle("Monday") + ylab('# Visitors') + xlab('Avg. Session Length') + theme(legend.position="none") +
-      geom_point(aes(color=nearMall), size=2) + scale_color_brewer(palette="Set1") + 
-      geom_text(aes(y=mallVisits+1, label = paste0(name), size=text_size)) + 
-      theme(axis.text=element_text(size=12), axis.title=element_text(size=axis_title_size,face="bold"), plot.title=element_text(size=plot_size, face="bold"))
-  }
+    batteryStats$uniqueUserPCT <- NA
+    batteryStats$uniqueUserPCT[batteryStats$nearMall==FALSE] <- round(100*batteryStats$uniqueUserCount[batteryStats$nearMall==FALSE] / otherUsers, digits = 1)
+    batteryStats$uniqueUserPCT[batteryStats$nearMall==TRUE] <- round(100*batteryStats$uniqueUserCount[batteryStats$nearMall==TRUE] / nearMallUsers, digits = 1)
+    
+    
+    pCount <- ggplot(data=filter(batteryStats, drainRateGroup<=100), aes(x=drainRateGroup,y=countPCT, fill=nearMall)) + 
+      ggtitle("# of Observations (% within of each group)") + ylab('# Times Observed (%)') + xlab(paste0('Battery Drain Rate (% per hour)')) + 
+      geom_bar(stat="identity", position='dodge') + geom_text(aes(label=paste0(countPCT, '%')), vjust=1, position=position_dodge(9)) +
+      theme(axis.text=element_text(size=12.5),axis.title=element_text(size=axis_title_size,face="bold"), plot.title=element_text(size=plot_size, face="bold")) + 
+      scale_x_discrete(limits=c(0,10,20,30,40,50,60,70,80,90,100))
+    
+    pUser <-ggplot(data=filter(batteryStats, drainRateGroup<=100), aes(x=drainRateGroup,y=uniqueUserPCT, fill=nearMall)) + 
+      ggtitle("# of Users (% within of each group)") + ylab('# Unique Users Observed (%)') + xlab(paste0('Battery Drain Rate (% per hour)')) + 
+      geom_bar(stat="identity", position='dodge') + geom_text(aes(label=paste0(uniqueUserPCT, '%')), vjust=1, position=position_dodge(9)) +
+      theme(axis.text=element_text(size=12.5),axis.title=element_text(size=axis_title_size,face="bold"), plot.title=element_text(size=plot_size, face="bold")) + 
+      scale_x_discrete(limits=c(0,10,20,30,40,50,60,70,80,90,100)) +
+      labs(caption="(All activity is considered for both groups, including times when they may or may not be at home/work or in/out malls.)")
+    
+    grid.arrange(pCount, pUser, ncol = 1, top=textGrob("Battery Drain Statistics for People Who Live/Work Near Malls vs. Those Who Don't", gp=gpar(fontsize=20)))
+    
+    }
   
 }

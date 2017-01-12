@@ -5,40 +5,77 @@
 #Parameters: 
 #maxMinsSameMall -> max amount of minutes needed in order for two consecutive requests to count as the same session
 
-addSessions <- function(mallRestReq, maxMinsSameMall) {
+addSessions <- function(mallRestReq, maxMinsSameMall, mode = c("mall", "shop")) {
 
   #Filter & Sort Data
   mallRestReq <- mallRestReq %>% 
     filter(mall_id != 0 & is.na(mall_id) == FALSE) %>%
     arrange(desc(session_id), timestamp)
   
-  #Identify Sessions
-  sessionNum <- 1
-  mallRestReq$sessionNo <- 0
-  mallRestReq$sessionNo[[1]] <- 1
-  prevUser <- as.character(mallRestReq$session_id[[1]])
-  prevDate <- as.character(mallRestReq$timestamp[[1]])
-  prevMallid <- as.character(mallRestReq$mall_id[[1]])
-  
-  foreach (i = 2:nrow(mallRestReq)) %dopar% {
-    curUser <- as.character(mallRestReq$session_id[[i]])
-    curDate <- as.character(mallRestReq$timestamp[[i]])
-    curMallid <- as.character(mallRestReq$mall_id[[i]])
+  #Identify Mall Sessions
+  if (mode == "mall"){
+    print("...Finding Mall Sessions...")
     
-    date_diff <- as.numeric(difftime(strptime(curDate, "%Y-%m-%d %H:%M:%S"), strptime(prevDate, "%Y-%m-%d %H:%M:%S"), units="mins"))
+    sessionNum <- 1
+    mallRestReq$sessionNo <- 0
+    mallRestReq$sessionNo[[1]] <- 1
+    prevUser <- as.character(mallRestReq$session_id[[1]])
+    prevDate <- as.character(mallRestReq$timestamp[[1]])
+    prevMallid <- as.character(mallRestReq$mall_id[[1]])
     
-    if (curUser==prevUser & curMallid==prevMallid & abs(date_diff)<=maxMinsSameMall){
-      mallRestReq$sessionNo[[i]] <- sessionNum
+    foreach (i = 2:nrow(mallRestReq)) %do% {
+      curUser <- as.character(mallRestReq$session_id[[i]])
+      curDate <- as.character(mallRestReq$timestamp[[i]])
+      curMallid <- as.character(mallRestReq$mall_id[[i]])
+      
+      date_diff <- as.numeric(difftime(strptime(curDate, "%Y-%m-%d %H:%M:%S"), strptime(prevDate, "%Y-%m-%d %H:%M:%S"), units="mins"))
+      
+      if (curUser==prevUser & curMallid==prevMallid & abs(date_diff)<=maxMinsSameMall){
+        mallRestReq$sessionNo[[i]] <- sessionNum
+      }
+      else{
+        sessionNum <- sessionNum + 1
+        mallRestReq$sessionNo[[i]] <- sessionNum
+      }
+      
+      prevUser <- curUser
+      prevDate <- curDate
+      prevMallid <- curMallid
     }
-    else{
-      sessionNum <- sessionNum + 1
-      mallRestReq$sessionNo[[i]] <- sessionNum
-    }
+  } else if(mode == "shop"){
+    print("...Finding Shop Sessions...")
     
-    prevUser <- curUser
-    prevDate <- curDate
-    prevMallid <- curMallid
+    sessionNum <- 1
+    mallRestReq$sessionNo <- 0
+    mallRestReq$sessionNo[[1]] <- 1
+    prevUser <- as.character(mallRestReq$session_id[[1]])
+    prevDate <- as.character(mallRestReq$timestamp[[1]])
+    prevMallid <- as.character(mallRestReq$mall_id[[1]])
+    prevShopid <- as.character(mallRestReq$shop_id[[1]])
+    
+    foreach (i = 2:nrow(mallRestReq)) %do% {
+      curUser <- as.character(mallRestReq$session_id[[i]])
+      curDate <- as.character(mallRestReq$timestamp[[i]])
+      curMallid <- as.character(mallRestReq$mall_id[[i]])
+      curShopid <- as.character(mallRestReq$shop_id[[i]])
+      
+      date_diff <- as.numeric(difftime(strptime(curDate, "%Y-%m-%d %H:%M:%S"), strptime(prevDate, "%Y-%m-%d %H:%M:%S"), units="mins"))
+      
+      if (curUser==prevUser & curMallid==prevMallid & curShopid==prevShopid & abs(date_diff)<=maxMinsSameMall){
+        mallRestReq$sessionNo[[i]] <- sessionNum
+      }
+      else{
+        sessionNum <- sessionNum + 1
+        mallRestReq$sessionNo[[i]] <- sessionNum
+      }
+      
+      prevUser <- curUser
+      prevDate <- curDate
+      prevMallid <- curMallid
+      prevShopid <- curShopid
+    }
   }
+  
 
   return(mallRestReq)
 }
